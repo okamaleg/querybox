@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Send, Database, Sparkles } from "lucide-react";
+import { Send, Database, Sparkles, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -87,6 +87,19 @@ export function ChatPanel({ connectionId }: ChatPanelProps) {
 
   return (
     <div className="flex flex-col h-full bg-zinc-950">
+      {/* Clear chat button */}
+      {!isEmpty && (
+        <div className="shrink-0 flex justify-end px-4 pt-2">
+          <button
+            onClick={() => setChatMessages([])}
+            className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+          >
+            <Trash2 className="size-3" />
+            Clear chat
+          </button>
+        </div>
+      )}
+
       {/* Message list */}
       <ScrollArea className="flex-1 min-h-0">
         <div className="px-4 py-4 flex flex-col gap-4">
