@@ -36,5 +36,5 @@ nsis:
   allowToChangeInstallationDirectory: true
 publish:
   provider: github
-  owner: ${GH_OWNER}
+  owner: okamaleg
   repo: querybox

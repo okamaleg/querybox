@@ -1,6 +1,8 @@
 {
   "name": "querybox",
   "version": "0.1.0",
+  "description": "Chat with your database using natural language",
+  "author": "okamaleg",
   "private": true,
   "main": "dist-electron/main.js",
   "scripts": {
