@@ -31,8 +31,14 @@ interface UseChatReturn {
   isLoading: boolean;
 }
 
-export function useChat(connectionId: string): UseChatReturn {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+export function useChat(
+  connectionId: string,
+  externalMessages?: ChatMessage[],
+  externalSetMessages?: React.Dispatch<React.SetStateAction<ChatMessage[]>>
+): UseChatReturn {
+  const [internalMessages, internalSetMessages] = useState<ChatMessage[]>([]);
+  const messages = externalMessages ?? internalMessages;
+  const setMessages = externalSetMessages ?? internalSetMessages;
   const [isLoading, setIsLoading] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const messagesRef = useRef<ChatMessage[]>([]);

@@ -7,6 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { MessageBubble } from "./message-bubble";
 import { StreamingIndicator } from "./streaming-indicator";
 import { useChat } from "@/hooks/use-chat";
+import { useAppState } from "@/hooks/use-app-state";
 
 const SUGGESTED_QUERIES = [
   "Show me all tables",
@@ -24,7 +25,8 @@ export function ChatPanel({ connectionId }: ChatPanelProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [input, setInput] = useState("");
 
-  const { messages, sendMessage, isLoading } = useChat(connectionId);
+  const { chatMessages, setChatMessages } = useAppState();
+  const { messages, sendMessage, isLoading } = useChat(connectionId, chatMessages, setChatMessages);
 
   // Auto-scroll to bottom on new messages or streaming
   useEffect(() => {

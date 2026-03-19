@@ -6,6 +6,7 @@ import {
   useCallback,
   type ReactNode,
 } from "react";
+import type { ChatMessage } from "./use-chat";
 
 interface Connection {
   id: string;
@@ -26,6 +27,8 @@ interface AppState {
   activeConnectionId: string | null;
   settings: Settings;
   isLoading: boolean;
+  chatMessages: ChatMessage[];
+  setChatMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
   setActiveConnectionId: (id: string | null) => void;
   refreshConnections: () => Promise<void>;
   refreshSettings: () => Promise<void>;
@@ -45,6 +48,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     theme: "dark",
   });
   const [isLoading, setIsLoading] = useState(true);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
 
   const refreshConnections = useCallback(async () => {
     try {
@@ -96,6 +100,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         activeConnectionId,
         settings,
         isLoading,
+        chatMessages,
+        setChatMessages,
         setActiveConnectionId,
         refreshConnections,
         refreshSettings,
