@@ -1,10 +1,13 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
+import fastifyStatic from "@fastify/static";
+import path from "path";
 import connectionsRoutes from "./routes/connections.js";
 import chatRoutes from "./routes/chat.js";
 import settingsRoutes from "./routes/settings.js";
 
 const PORT = 3099;
+const isDev = process.env.NODE_ENV !== "production";
 
 export async function startServer() {
   const fastify = Fastify({
@@ -18,13 +21,31 @@ export async function startServer() {
     allowedHeaders: ["Content-Type", "Authorization"],
   });
 
-  // Routes
+  // API Routes
   await fastify.register(connectionsRoutes, { prefix: "/api/connections" });
   await fastify.register(chatRoutes, { prefix: "/api/chat" });
   await fastify.register(settingsRoutes, { prefix: "/api/settings" });
 
   // Health check
   fastify.get("/api/health", async () => ({ ok: true }));
+
+  // In production, serve the Vite build as static files
+  if (!isDev) {
+    const distPath = path.join(__dirname, "..", "dist");
+    await fastify.register(fastifyStatic, {
+      root: distPath,
+      prefix: "/",
+    });
+
+    // SPA fallback — serve index.html for all non-API routes
+    fastify.setNotFoundHandler((req, reply) => {
+      if (req.url.startsWith("/api/")) {
+        reply.status(404).send({ error: "Not found" });
+      } else {
+        reply.sendFile("index.html");
+      }
+    });
+  }
 
   try {
     await fastify.listen({ port: PORT, host: "127.0.0.1" });
