@@ -1,36 +1,30 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Querybox
 
-## Getting Started
+Chat with your database using natural language. Connect your DB, start chatting — the AI already knows your schema.
 
-First, run the development server:
+**Supports:** PostgreSQL · MySQL · MongoDB · SQLite
+
+## Quick Start
 
 ```bash
+git clone https://github.com/okamaleg/querybox.git
+cd querybox
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open **http://localhost:5173**
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Setup
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. Go to **Settings** and enter your [Anthropic API key](https://console.anthropic.com/settings/keys)
+2. Go to **Connections** → **New Connection** → pick your DB type and enter credentials
+3. Click the connection in the sidebar → start chatting
 
-## Learn More
+## Features
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Natural language queries — ask in plain English, get SQL results
+- Auto schema discovery — no copy-pasting your schema
+- Safety mode — read-only by default, toggle writes in settings
+- Query optimization — get EXPLAIN plans and suggestions
+- 100% local — credentials encrypted on your machine, never sent anywhere

@@ -6,7 +6,7 @@ import connectionsRoutes from "./routes/connections.js";
 import chatRoutes from "./routes/chat.js";
 import settingsRoutes from "./routes/settings.js";
 
-const PORT = 3099;
+const PORT = parseInt(process.env.PORT || "3099", 10);
 const isDev = process.env.NODE_ENV !== "production";
 
 export async function startServer() {
@@ -48,7 +48,8 @@ export async function startServer() {
   }
 
   try {
-    await fastify.listen({ port: PORT, host: "127.0.0.1" });
+    const host = isDev ? "127.0.0.1" : "0.0.0.0";
+    await fastify.listen({ port: PORT, host });
     console.log(`Querybox server listening on http://127.0.0.1:${PORT}`);
   } catch (err) {
     fastify.log.error(err);
