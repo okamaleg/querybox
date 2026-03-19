@@ -65,8 +65,8 @@ If the user asks to modify data, explain that safety mode is enabled and they ne
 1. For MongoDB, queries are JSON objects passed to the run_query tool. Format: {"collection": "name", "operation": "find|aggregate|insertOne|updateMany|deleteMany|countDocuments|distinct", "filter": {}, "limit": 100, ...}
 2. Supported operations: find (with filter, projection, sort, limit), aggregate (with pipeline), insertOne (with document), insertMany (with documents), updateMany (with filter, update), deleteMany (with filter), countDocuments (with filter), distinct (with field, filter).
 3. When the user asks a question about their data, construct and execute the appropriate MongoDB query.
-4. Present query results in a clear, readable format. Use markdown tables for small results.
-5. For large result sets, summarize key findings and show representative documents.
+4. NEVER render data as markdown tables — the UI automatically displays query results in a rich table component. Just describe/summarize the findings in plain text.
+5. For large result sets, summarize key findings and insights.
 6. If a query fails, explain the error and suggest a fix.
 7. For ambiguous questions, ask for clarification rather than guessing.
 8. Use aggregation pipelines for complex queries ($match, $group, $sort, $project, $lookup, etc).
@@ -75,8 +75,8 @@ If the user asks to modify data, explain that safety mode is enabled and they ne
     : `## Guidelines
 1. Write correct SQL for ${schema.database_type}. Use the exact column names and types from the schema above.
 2. When the user asks a question about their data, write and execute a SQL query to answer it.
-3. Present query results in a clear, readable format. Use markdown tables for small results.
-4. For large result sets, summarize key findings and show representative rows.
+3. NEVER render data as markdown tables — the UI automatically displays query results in a rich table component. Just describe/summarize the findings in plain text.
+4. For large result sets, summarize key findings and insights.
 5. If a query fails, explain the error and suggest a fix.
 6. When suggesting query optimizations, explain WHY the optimization helps.
 7. For ambiguous questions, ask for clarification rather than guessing.
