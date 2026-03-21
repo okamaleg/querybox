@@ -32,6 +32,8 @@ export function SqlResultTable({
   truncated,
 }: SqlResultProps) {
   const [queryExpanded, setQueryExpanded] = useState(false);
+  const ROWS_PER_PAGE = 50;
+  const [visibleRows, setVisibleRows] = useState(ROWS_PER_PAGE);
 
   return (
     <div className="rounded-lg border border-zinc-700 bg-zinc-900 overflow-hidden text-sm w-full">
@@ -111,7 +113,7 @@ export function SqlResultTable({
               </tr>
             </thead>
             <tbody>
-              {rows.map((row, i) => (
+              {rows.slice(0, visibleRows).map((row, i) => (
                 <tr
                   key={i}
                   className={cn(
@@ -136,6 +138,15 @@ export function SqlResultTable({
               ))}
             </tbody>
           </table>
+
+          {rows.length > visibleRows && (
+            <button
+              onClick={() => setVisibleRows((v) => v + ROWS_PER_PAGE)}
+              className="w-full px-3 py-2 text-xs text-zinc-400 hover:text-zinc-200 bg-zinc-800/40 hover:bg-zinc-800/60 border-t border-zinc-700 transition-colors"
+            >
+              Show more ({rows.length - visibleRows} remaining)
+            </button>
+          )}
 
           {truncated && (
             <div className="px-3 py-1.5 text-xs text-zinc-500 bg-zinc-800/40 border-t border-zinc-700">

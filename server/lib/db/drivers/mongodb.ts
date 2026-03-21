@@ -52,6 +52,9 @@ export function createMongoDriver(config: MongoConfig): DatabaseDriver {
       const url = buildConnectionUrl(config);
       client = new MongoClient(url, {
         tls: config.ssl,
+        connectTimeoutMS: 5000,
+        socketTimeoutMS: 30000,
+        serverSelectionTimeoutMS: 5000,
       });
       await client.connect();
     },

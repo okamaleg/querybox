@@ -1,3 +1,4 @@
+import { memo, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { SqlResultTable } from "./sql-result-table";
 import type { ChatMessage, ToolCall } from "@/hooks/use-chat";
@@ -143,7 +144,7 @@ function renderInline(text: string): React.ReactNode {
 // ---------------------------------------------------------------------------
 // Tool call renderer
 // ---------------------------------------------------------------------------
-function ToolCallResult({ toolCall }: { toolCall: ToolCall }) {
+const ToolCallResult = memo(function ToolCallResult({ toolCall }: { toolCall: ToolCall }) {
   if (!toolCall.result) {
     return (
       <div className="text-xs text-zinc-500 italic px-1 py-0.5">
@@ -201,13 +202,17 @@ function ToolCallResult({ toolCall }: { toolCall: ToolCall }) {
       {JSON.stringify(result, null, 2)}
     </pre>
   );
-}
+});
 
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
-export function MessageBubble({ message }: MessageBubbleProps) {
+export const MessageBubble = memo(function MessageBubble({ message }: MessageBubbleProps) {
   const isUser = message.role === "user";
+  const renderedContent = useMemo(
+    () => (!isUser && message.content ? renderMarkdown(message.content) : null),
+    [message.content, isUser]
+  );
 
   return (
     <div className={cn("flex flex-col gap-1 w-full", isUser ? "items-end" : "items-start")}>
@@ -228,7 +233,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             <p className="whitespace-pre-wrap">{message.content}</p>
           ) : (
             <div className="flex flex-col gap-0.5">
-              {renderMarkdown(message.content)}
+              {renderedContent}
             </div>
           )}
         </div>
@@ -244,4 +249,4 @@ export function MessageBubble({ message }: MessageBubbleProps) {
       )}
     </div>
   );
-}
+});

@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { FastifyReply } from "fastify";
-import { createDriver } from "../db/drivers/index.js";
+import { createDriver, type DatabaseDriver } from "../db/drivers/index.js";
 import { validateSQL } from "./validator.js";
 import { buildSystemPrompt } from "./system-prompt.js";
 import type { ConnectionConfig, DatabaseSchema } from "../schemas.js";
@@ -10,6 +10,18 @@ const MAX_TOKENS = 8192;
 
 type AnthropicMessage = Anthropic.MessageParam;
 
+// Cache Anthropic clients by API key to avoid re-instantiation per request
+const clientCache = new Map<string, Anthropic>();
+
+function getClient(apiKey: string): Anthropic {
+  let client = clientCache.get(apiKey);
+  if (!client) {
+    client = new Anthropic({ apiKey });
+    clientCache.set(apiKey, client);
+  }
+  return client;
+}
+
 function sseWrite(reply: FastifyReply, data: unknown): void {
   reply.raw.write(`data: ${JSON.stringify(data)}\n\n`);
 }
@@ -18,10 +30,9 @@ async function executeTool(
   toolName: string,
   toolInput: Record<string, unknown>,
   config: ConnectionConfig,
-  safetyMode: boolean
+  safetyMode: boolean,
+  driver: DatabaseDriver
 ): Promise<unknown> {
-  const driver = createDriver(config);
-
   if (toolName === "run_query") {
     const query = (toolInput.query as string) ?? "";
     const validation = validateSQL(query, safetyMode);
@@ -35,12 +46,9 @@ async function executeTool(
     }
 
     try {
-      await driver.connect();
       const result = await driver.query(query);
-      await driver.disconnect();
       return { success: true, query, ...result };
     } catch (e) {
-      await driver.disconnect().catch(() => {});
       return {
         success: false,
         error: e instanceof Error ? e.message : "Query execution failed",
@@ -67,12 +75,9 @@ async function executeTool(
     }
 
     try {
-      await driver.connect();
       const result = await driver.query(explainQuery);
-      await driver.disconnect();
       return { success: true, original_query: query, ...result };
     } catch (e) {
-      await driver.disconnect().catch(() => {});
       return {
         success: false,
         error: e instanceof Error ? e.message : "Failed to explain query",
@@ -92,7 +97,6 @@ async function executeTool(
     }
 
     try {
-      await driver.connect();
       let result;
       if (isMongo) {
         result = await driver.query(
@@ -106,7 +110,6 @@ async function executeTool(
       } else {
         result = await driver.query(`SELECT * FROM "${tableName}" LIMIT ${limit}`);
       }
-      await driver.disconnect();
       return {
         success: true,
         table: tableName,
@@ -115,7 +118,6 @@ async function executeTool(
         row_count: result.row_count,
       };
     } catch (e) {
-      await driver.disconnect().catch(() => {});
       return {
         success: false,
         error: e instanceof Error ? e.message : "Failed to sample table",
@@ -192,100 +194,109 @@ export async function streamChat(
   apiKey: string,
   reply: FastifyReply
 ): Promise<void> {
-  const client = new Anthropic({ apiKey });
+  const client = getClient(apiKey);
   const systemPrompt = buildSystemPrompt(schema, safetyMode);
 
   const conversationMessages: AnthropicMessage[] = [...messages];
 
-  // Agentic loop: stream -> detect tool_use -> execute -> continue
-  while (true) {
-    const stream = client.messages.stream({
-      model: MODEL,
-      max_tokens: MAX_TOKENS,
-      system: systemPrompt,
-      tools: TOOLS,
-      messages: conversationMessages,
-    });
+  // Create driver once for the entire chat session
+  const driver = createDriver(connectionConfig);
+  await driver.connect();
 
-    const toolUseBlocks: Anthropic.ToolUseBlock[] = [];
-    let assistantText = "";
+  try {
+    // Agentic loop: stream -> detect tool_use -> execute -> continue
+    while (true) {
+      const stream = client.messages.stream({
+        model: MODEL,
+        max_tokens: MAX_TOKENS,
+        system: systemPrompt,
+        tools: TOOLS,
+        messages: conversationMessages,
+      });
 
-    for await (const event of stream) {
-      if (event.type === "content_block_delta") {
-        if (event.delta.type === "text_delta") {
-          assistantText += event.delta.text;
-          sseWrite(reply, { type: "text", content: event.delta.text });
-        } else if (event.delta.type === "input_json_delta") {
-          // tool input streaming — accumulate silently
-        }
-      } else if (event.type === "content_block_start") {
-        if (event.content_block.type === "tool_use") {
-          sseWrite(reply, {
-            type: "tool_call",
-            name: event.content_block.name,
-            id: event.content_block.id,
-          });
+      const toolUseBlocks: Anthropic.ToolUseBlock[] = [];
+      let assistantText = "";
+
+      for await (const event of stream) {
+        if (event.type === "content_block_delta") {
+          if (event.delta.type === "text_delta") {
+            assistantText += event.delta.text;
+            sseWrite(reply, { type: "text", content: event.delta.text });
+          } else if (event.delta.type === "input_json_delta") {
+            // tool input streaming — accumulate silently
+          }
+        } else if (event.type === "content_block_start") {
+          if (event.content_block.type === "tool_use") {
+            sseWrite(reply, {
+              type: "tool_call",
+              name: event.content_block.name,
+              id: event.content_block.id,
+            });
+          }
         }
       }
-    }
 
-    const finalMessage = await stream.finalMessage();
+      const finalMessage = await stream.finalMessage();
 
-    // Collect tool_use blocks from final response
-    for (const block of finalMessage.content) {
-      if (block.type === "tool_use") {
-        toolUseBlocks.push(block);
+      // Collect tool_use blocks from final response
+      for (const block of finalMessage.content) {
+        if (block.type === "tool_use") {
+          toolUseBlocks.push(block);
+        }
       }
-    }
 
-    // Add assistant turn to conversation
-    conversationMessages.push({
-      role: "assistant",
-      content: finalMessage.content,
-    });
-
-    // If no tool calls, we're done
-    if (toolUseBlocks.length === 0 || finalMessage.stop_reason !== "tool_use") {
-      break;
-    }
-
-    // Execute all tool calls and collect results
-    const toolResults: Anthropic.ToolResultBlockParam[] = [];
-
-    for (const toolUse of toolUseBlocks) {
-      // Send full input now that we have it (streaming only sent name+id)
-      sseWrite(reply, {
-        type: "tool_input",
-        name: toolUse.name,
-        input: toolUse.input,
+      // Add assistant turn to conversation
+      conversationMessages.push({
+        role: "assistant",
+        content: finalMessage.content,
       });
 
-      const result = await executeTool(
-        toolUse.name,
-        toolUse.input as Record<string, unknown>,
-        connectionConfig,
-        safetyMode
-      );
+      // If no tool calls, we're done
+      if (toolUseBlocks.length === 0 || finalMessage.stop_reason !== "tool_use") {
+        break;
+      }
 
-      sseWrite(reply, {
-        type: "tool_result",
-        name: toolUse.name,
-        result,
-      });
+      // Execute all tool calls and collect results
+      const toolResults: Anthropic.ToolResultBlockParam[] = [];
 
-      toolResults.push({
-        type: "tool_result",
-        tool_use_id: toolUse.id,
-        content: JSON.stringify(result),
+      for (const toolUse of toolUseBlocks) {
+        // Send full input now that we have it (streaming only sent name+id)
+        sseWrite(reply, {
+          type: "tool_input",
+          name: toolUse.name,
+          input: toolUse.input,
+        });
+
+        const result = await executeTool(
+          toolUse.name,
+          toolUse.input as Record<string, unknown>,
+          connectionConfig,
+          safetyMode,
+          driver
+        );
+
+        sseWrite(reply, {
+          type: "tool_result",
+          name: toolUse.name,
+          result,
+        });
+
+        toolResults.push({
+          type: "tool_result",
+          tool_use_id: toolUse.id,
+          content: JSON.stringify(result),
+        });
+      }
+
+      // Add tool results turn
+      conversationMessages.push({
+        role: "user",
+        content: toolResults,
       });
     }
 
-    // Add tool results turn
-    conversationMessages.push({
-      role: "user",
-      content: toolResults,
-    });
+    sseWrite(reply, { type: "done" });
+  } finally {
+    await driver.disconnect().catch(() => {});
   }
-
-  sseWrite(reply, { type: "done" });
 }

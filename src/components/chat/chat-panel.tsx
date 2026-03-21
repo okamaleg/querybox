@@ -28,10 +28,18 @@ export function ChatPanel({ connectionId }: ChatPanelProps) {
   const { chatMessages, setChatMessages } = useAppState();
   const { messages, sendMessage, isLoading } = useChat(connectionId, chatMessages, setChatMessages);
 
-  // Auto-scroll to bottom on new messages or streaming
+  // Auto-scroll on new messages
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isLoading]);
+  }, [messages.length]);
+
+  // Keep scrolled during streaming (instant to avoid queuing smooth animations)
+  const lastContent = messages[messages.length - 1]?.content;
+  useEffect(() => {
+    if (isLoading) {
+      bottomRef.current?.scrollIntoView({ behavior: "instant" });
+    }
+  }, [lastContent, isLoading]);
 
   // Auto-resize textarea
   const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {

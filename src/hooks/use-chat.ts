@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 
 export interface ToolCall {
   name: string;
@@ -43,6 +43,15 @@ export function useChat(
   const abortRef = useRef<AbortController | null>(null);
   const messagesRef = useRef<ChatMessage[]>([]);
   messagesRef.current = messages;
+  const textBufferRef = useRef("");
+  const rafRef = useRef<number | null>(null);
+
+  // Cleanup rAF on unmount
+  useEffect(() => {
+    return () => {
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+    };
+  }, []);
 
   const sendMessage = useCallback(
     async (text: string) => {
@@ -112,17 +121,25 @@ export function useChat(
             }
 
             if (event.type === "text") {
-              setMessages((prev) => {
-                const updated = [...prev];
-                const last = updated[updated.length - 1];
-                if (last && last.role === "assistant") {
-                  updated[updated.length - 1] = {
-                    ...last,
-                    content: last.content + (event.content as string),
-                  };
-                }
-                return updated;
-              });
+              textBufferRef.current += event.content as string;
+              if (rafRef.current === null) {
+                rafRef.current = requestAnimationFrame(() => {
+                  const buffered = textBufferRef.current;
+                  textBufferRef.current = "";
+                  rafRef.current = null;
+                  setMessages((prev) => {
+                    const updated = [...prev];
+                    const last = updated[updated.length - 1];
+                    if (last && last.role === "assistant") {
+                      updated[updated.length - 1] = {
+                        ...last,
+                        content: last.content + buffered,
+                      };
+                    }
+                    return updated;
+                  });
+                });
+              }
             } else if (event.type === "tool_call") {
               const toolCall: ToolCall = {
                 name: event.name as string,
@@ -192,6 +209,27 @@ export function useChat(
               break;
             }
           }
+        }
+
+        // Flush any remaining buffered text
+        if (rafRef.current !== null) {
+          cancelAnimationFrame(rafRef.current);
+          rafRef.current = null;
+        }
+        if (textBufferRef.current) {
+          const remaining = textBufferRef.current;
+          textBufferRef.current = "";
+          setMessages((prev) => {
+            const updated = [...prev];
+            const last = updated[updated.length - 1];
+            if (last && last.role === "assistant") {
+              updated[updated.length - 1] = {
+                ...last,
+                content: last.content + remaining,
+              };
+            }
+            return updated;
+          });
         }
       } catch (err: unknown) {
         if (err instanceof Error && err.name === "AbortError") return;

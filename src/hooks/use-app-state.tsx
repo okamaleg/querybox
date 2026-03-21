@@ -4,6 +4,7 @@ import {
   useState,
   useEffect,
   useCallback,
+  useMemo,
   type ReactNode,
 } from "react";
 import type { ChatMessage } from "./use-chat";
@@ -93,21 +94,24 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     );
   }, [refreshConnections, refreshSettings]);
 
+  const value = useMemo(
+    () => ({
+      connections,
+      activeConnectionId,
+      settings,
+      isLoading,
+      chatMessages,
+      setChatMessages,
+      setActiveConnectionId,
+      refreshConnections,
+      refreshSettings,
+      updateSettings,
+    }),
+    [connections, activeConnectionId, settings, isLoading, chatMessages]
+  );
+
   return (
-    <AppStateContext.Provider
-      value={{
-        connections,
-        activeConnectionId,
-        settings,
-        isLoading,
-        chatMessages,
-        setChatMessages,
-        setActiveConnectionId,
-        refreshConnections,
-        refreshSettings,
-        updateSettings,
-      }}
-    >
+    <AppStateContext.Provider value={value}>
       {children}
     </AppStateContext.Provider>
   );
